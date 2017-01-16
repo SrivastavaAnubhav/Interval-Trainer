@@ -1,0 +1,53 @@
+h1 {
+	margin: 0px;
+	padding: 0px;
+	display: inline;
+}
+
+table {
+	border-collapse: collapse;
+	margin: auto;
+	table-layout: fixed;
+	width: 80%;
+}
+
+td {
+  border: 1px solid black;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#content {
+	text-align: center;
+}
+
+.control {
+	padding: 10px;
+	margin-bottom: 10px;
+}
+
+#play {
+	height: 10%;
+	width: 15%;
+}
+
+#replay {
+	height: 10%;
+	width: 10%;
+}
+
+#options {
+	margin: auto;
+	text-align: center;
+	height: 250px;
+	width: 500px;
+}
+
+.option {
+	border-radius: 100px;
+    height: 20%; 
+    width: 30%;
+    margin: 2px;
+    outline: none;
+}
