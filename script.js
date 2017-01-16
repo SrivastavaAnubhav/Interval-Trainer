@@ -2,28 +2,70 @@ $(document).ready(function() {
 	$('#options :button').prop("disabled", true);
 	$('#replay').prop("disabled", true);
 
+	/* 
+	weights is a 14 x 13. Each row has the probability of failing from
+	transitioning from the row into the column (i.e. if the relative
+	probability of failure with interval value of 4 (major 3rd) is 0.2
+	if the previous interval was 9, weights[9][4] = 0.2). The 14th row
+	is the start value, when there is no previous interval. Also, any row
+	sums to 1.
+	*/
 	var firstNum, secondNum, weights;
 	var run = [];
 	initWeights();
 
+	// Prints an element to the test div
+	function print(x) {
+		$('#test').append("<p>" + x + "</p>");
+	}
+
+
+	// Prints a 1D array to the test div
+	function printarr(x) {
+		x.forEach(function(element) {
+			print(element);
+		});
+	}
+
+
+	// Gets an HTML table from an array
+	function helper(e) {
+		var column = "";
+		e.forEach(function(element) {
+			column = column.concat("<td>" + e + "</td>");
+		});
+
+		return "<tr>" + column + "</tr>";
+	}
+
+
+	// Prints a 2D array to the test div
+	function print2darr(x) {
+		var rows = "";
+
+		x.forEach(function(element) {
+			rows = rows.concat(helper(element));
+		});
+
+		$('#test').append("<table>" + rows + "</table>");
+	}
+
+
+	// Initializes the weights of the transition matrix uniformly
 	function initWeights() {
 		weights = new Array(14);
-		for (var i = 0; i < 13; i++) {
-			weights[i] = new Array(14);
-			for (var j = 0; j < 14; j++) {
-				weights[i][j] = 1/14;
+		for (var i = 0; i < 14; i++) {
+			weights[i] = new Array(13);
+			for (var j = 0; j < 13; j++) {
+				weights[i][j] = 1/13;
 			}
 		}
 
-		weights[13] = new Array(14);
-		for (var i = 0; i < 13; i++) {
-			weights[13][i] = 0;
-		}
-
-		weights[13][13] = 1;
 		print2darr(weights);
 	}
 
+
+	// Plays the first and second notes in sequence
 	function playBoth() {
 		var first = new Audio("Notes/" + getLoc(firstNum));
 		var second = new Audio("Notes/" + getLoc(secondNum));
@@ -36,6 +78,73 @@ $(document).ready(function() {
 	}
 
 
+	function updateWeightsGood(row) {
+		var initial = weights[row][13];
+		var final = initial + adjustGood(initial);
+		var change = (1 - final)/(1 - initial); //should be >1
+		for (var i = 0; i < 14; i++) {
+			weights[row][i] *= change;
+		}
+		weights[row][13] = final;
+	}
+
+
+	function adjustGood(x) {
+		// returns the value to decrease fail rate by (negative)
+		return 5*Math.pow(x-0.6, 2)/9 - 0.2;
+	}
+
+
+	// t is how far from the end start is; can only change one pair at a time
+	function updateWeightsBad(start, next, t) {
+		var a = weights[start][next]; // a is the initial value
+		var diff = (a*adjustBad(a) - a)/t; // the corrected difference between a and the final value 
+		var final = a + diff;
+		var change = (1 - final)/(1 - a);
+		for (var i = 0; i < 14; i++) {
+			weights[start][i] *= change;
+		}
+		weights[start][next] = final;
+	}
+
+
+	function adjustBad(x) {
+		return 1 + 1/(1+ Math.exp(-4)) - 1/(1 + Math.exp((-8)*x + 4));
+	}
+
+
+	// Takes in an array of numbers and returns the max
+	function listmax(ls) {
+		cum = 0;
+		ls.forEach(function(item) {
+			if (item > cum) {
+				cum = item;
+			}
+		});
+
+		return cum;
+	}
+
+
+	function chooseInterval() {
+		var maxes = [];
+		var globmax = 0;
+		for (var i = 0; i < 13; i++) {
+			if (listmax(weights[i]) > globmax) {
+				globmax = listmax(weights[i]);
+			}
+		}
+
+		for (var i = 0; i < 13; i++) {
+			if (listmax(weights[i]) == globmax) {
+				maxes.push(i);
+			}
+		}
+		return maxes[Math.floor(Math.random() *  maxes.length)];
+	}
+
+
+	// Controls the clicking of the play button
 	$('#play').click(function() {
 		resetButtons();
 		$(this).prop("disabled", true);
@@ -57,11 +166,14 @@ $(document).ready(function() {
 	});
 
 
+	// Clicking replay just plays both notes again
 	$('#replay').click(function() {
 		playBoth();
 	});
 
 
+	// When an option is selected, disables all others,
+	// records whether is was correct and updates weights
 	$('.option').click(function() {
 		$('#options :button').prop("disabled", true);
 		$('#play').prop("disabled", false);		
@@ -94,113 +206,10 @@ $(document).ready(function() {
 		print2darr(weights);
 
 	});
-
-	function updateWeightsGood(row) {
-		var initial = weights[row][13];
-		var final = initial + adjustGood(initial);
-		var change = (1 - final)/(1 - initial); //should be >1
-		for (var i = 0; i < 14; i++) {
-			weights[row][i] *= change;
-		}
-		weights[row][13] = final;
-	}
-
-
-	function adjustGood(x) {
-		// returns the value to decrease fail rate by (negative)
-		return 5*Math.pow(x-0.6, 2)/9 - 0.2;
-	}
-
-
-	// t is how far from the end start is; can only change one pair at a time
-	function updateWeightsBad(start, next, t) {
-//		print("Start: " + start);
-//		print("Next: " + next);
-//		print("t: " + t);
-		var a = weights[start][next]; // a is the initial value
-		var diff = (a*adjustBad(a) - a)/t; // the corrected difference between a and the final value 
-		var final = a + diff;
-		var change = (1 - final)/(1 - a);
-		for (var i = 0; i < 14; i++) {
-			weights[start][i] *= change;
-		}
-		weights[start][next] = final;
-	}
-
-	function adjustBad(x) {
-		return 1 + 1/(1+ Math.exp(-4)) - 1/(1 + Math.exp((-8)*x + 4));
-	}
-
-	function chooseInterval() {
-		var maxes = [];
-		var globmax = 0;
-		for (var i = 0; i < 13; i++) {
-			if (listmax(weights[i]) > globmax) {
-				globmax = listmax(weights[i]);
-			}
-		}
-
-		for (var i = 0; i < 13; i++) {
-			if (listmax(weights[i]) == globmax) {
-				maxes.push(i);
-			}
-		}
-		debugger;
-		return maxes[Math.floor(Math.random() *  maxes.length)];
-	}
-
-	function listmax(ls) {
-		cum = 0;
-		ls.forEach(function(item) {
-			if (item > cum) {
-				cum = item;
-			}
-		});
-
-		return cum;
-	}
-
 });
 
 
-function print(x) {
-	$('#test').append("<p>" + x + "</p>");
-}
-
-
-function printarr(x) {
-	x.forEach(function(element) {
-		print(element);
-	});
-}
-
-
-function print2darr(x) {
-	var rows = "";
-
-	x.forEach(function(element) {
-		rows = rows.concat(helper(element));
-	});
-
-	$('#test').append("<table>" + rows + "</table>");
-}
-
-
-function helper(e) {
-	var column = "";
-	e.forEach(function(element) {
-		column = column.concat(helper2(element));
-	});
-
-	return "<tr>" + column + "</tr>";
-}
-
-
-function helper2(e) {
-	return "<td>" + e + "</td>";
-}
-
-
+// Re-enables buttons
 function resetButtons() {
 	$('#options :button').prop('disabled', false);
 	$('#options :button').prop('style','');
@@ -208,6 +217,8 @@ function resetButtons() {
 }
 
 
+// Returns the correct note given index
+// Maybe one day I will be able to auto-generate audio...
 function getLoc(index) {
 	var noteLocations = {
 		1:"C3.wav",
