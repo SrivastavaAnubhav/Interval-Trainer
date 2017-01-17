@@ -10,8 +10,9 @@ $(document).ready(function() {
 	is the start value, when there is no previous interval. Also, any row
 	sums to 1.
 	*/
+	const START = 13;
 	var firstNum, secondNum, weights;
-	var run = [];
+	var run = [START]; // initially holds the start symbol 
 	initWeights();
 
 	// Prints an element to the test div
@@ -29,10 +30,10 @@ $(document).ready(function() {
 
 
 	// Gets an HTML table from an array
-	function helper(e) {
+	function tableFromArray(arr) {
 		var column = "";
-		e.forEach(function(element) {
-			column = column.concat("<td>" + e + "</td>");
+		arr.forEach(function(element) {
+			column = column.concat("<td>" + element + "</td>");
 		});
 
 		return "<tr>" + column + "</tr>";
@@ -43,8 +44,8 @@ $(document).ready(function() {
 	function print2darr(x) {
 		var rows = "";
 
-		x.forEach(function(element) {
-			rows = rows.concat(helper(element));
+		x.forEach(function(row) {
+			rows = rows.concat(tableFromArray(row));
 		});
 
 		$('#test').append("<table>" + rows + "</table>");
@@ -78,38 +79,24 @@ $(document).ready(function() {
 	}
 
 
-	function updateWeightsGood(row) {
-		var initial = weights[row][13];
-		var final = initial + adjustGood(initial);
-		var change = (1 - final)/(1 - initial); //should be >1
-		for (var i = 0; i < 14; i++) {
-			weights[row][i] *= change;
+	// Simple model for now, take away weight from the one we got right
+	// so that we get it less in the future
+	function updateWeightsSuccess(from, to) { 
+		for (var i = 0; i < 13; i++) {
+			weights[from][i] += 0.01;
 		}
-		weights[row][13] = final;
+		weights[from][to] -= 0.13;
 	}
 
-
-	function adjustGood(x) {
-		// returns the value to decrease fail rate by (negative)
-		return 5*Math.pow(x-0.6, 2)/9 - 0.2;
-	}
-
-
-	// t is how far from the end start is; can only change one pair at a time
-	function updateWeightsBad(start, next, t) {
-		var a = weights[start][next]; // a is the initial value
-		var diff = (a*adjustBad(a) - a)/t; // the corrected difference between a and the final value 
-		var final = a + diff;
-		var change = (1 - final)/(1 - a);
-		for (var i = 0; i < 14; i++) {
-			weights[start][i] *= change;
+	// Just an inverse to updateWeightsSuccess for now, since weight is only
+	// increasing when distance is 0 (i.e. for the element we got wrong)
+	function updateWeightsFailure(from, to, distFromEnd) {
+		if (distFromEnd == 0) {
+			for (var i = 0; i < 13; i++) {
+				weights[from][i] -= 0.01;
+			}
+			weights[from][to] += 0.13;			
 		}
-		weights[start][next] = final;
-	}
-
-
-	function adjustBad(x) {
-		return 1 + 1/(1+ Math.exp(-4)) - 1/(1 + Math.exp((-8)*x + 4));
 	}
 
 
@@ -126,21 +113,17 @@ $(document).ready(function() {
 	}
 
 
-	function chooseInterval() {
-		var maxes = [];
-		var globmax = 0;
-		for (var i = 0; i < 13; i++) {
-			if (listmax(weights[i]) > globmax) {
-				globmax = listmax(weights[i]);
-			}
-		}
+	function chooseInterval(from) {
+		var cumsum = 0;
+		var count = -1;
+		var rand = Math.random();
 
-		for (var i = 0; i < 13; i++) {
-			if (listmax(weights[i]) == globmax) {
-				maxes.push(i);
-			}
-		}
-		return maxes[Math.floor(Math.random() *  maxes.length)];
+		do {
+			count++;
+			cumsum += weights[from][count];
+		} while (rand > cumsum);
+
+		return count;
 	}
 
 
@@ -151,8 +134,9 @@ $(document).ready(function() {
 		$(this).prop("value", 'gjhjqsfdsh'); // not working (clearly)
 	
 		firstNum = Math.floor(Math.random() * 25) + 1;
-		var chosenInterval = chooseInterval();
+		var chosenInterval = chooseInterval(run[run.length - 1]);
 
+		// array of valid choices
 		var choices = []
 		if (firstNum + chosenInterval < 26) {
 			choices.push(firstNum + chosenInterval);
@@ -180,26 +164,22 @@ $(document).ready(function() {
 	
 		var selectedNum = $(this).prop('id').substring(4,5);
 		var correctNum = Math.abs(firstNum - secondNum);
+
 		run.push(correctNum);
 
 		if (selectedNum == correctNum) {
 			$(this).css("background-color", "limegreen");
-			updateWeightsGood(run[run.length - 1]); // previous element was a success
+			updateWeightsSuccess(run[run.length - 2], run[run.length-1]);
 		}
 		else {
 			$(this).css("background-color", "red");
 			$('#diff' + Math.abs(firstNum - secondNum)).css("background-color", "limegreen");
-			run.push(13);
-			var l = run.length;
-//			print("Length is " + l);
-//			printarr(run);
-			debugger;
-			for(var i = l - 2; i > -1; i--) {
-//				print("i is " + i);
-				updateWeightsBad(run[i], run[i+1], l - i - 1);
+
+			for (var i = run.length - 1; i > 0; i--) {
+				updateWeightsFailure(run[i - 1], run[i], run.length - i - 1);
 			}
 
-			run = [];
+			run = [START];
 		}
 
 		$('#test').empty();
