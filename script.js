@@ -1,9 +1,10 @@
 $(document).ready(function() {
 	$('#options :button').prop("disabled", true);
 	$('#replay').prop("disabled", true);
+	$('#debug').prop("checked", true);
 
 	/* 
-	weights is a 14 x 13. Each row has the probability of failing from
+	weights is a 14 x 13 matrix. Each row has the probability of failing from
 	transitioning from the row into the column (i.e. if the relative
 	probability of failure with interval value of 4 (major 3rd) is 0.2
 	if the previous interval was 9, weights[9][4] = 0.2). The 14th row
@@ -12,31 +13,34 @@ $(document).ready(function() {
 	*/
 	const START = 13;
 	var firstNum, secondNum, weights;
-	var run = [START]; // initially holds the start symbol 
+	var run = [START]; // initially holds the start symbol
 	initWeights();
 
 	// Prints an element to the test div
 	function print(x) {
-		$('#test').append("<p>" + x + "</p>");
+		return "<p>" + x + "</p>";
 	}
 
 
 	// Prints a 1D array to the test div
 	function printarr(x) {
+		var row = "";
 		x.forEach(function(element) {
-			print(element);
+			row += print(element);
 		});
+
+		return row;
 	}
 
 
 	// Gets an HTML table from an array
-	function tableFromArray(arr) {
-		var column = "";
-		arr.forEach(function(element) {
-			column = column.concat("<td>" + element + "</td>");
+	function tableFromRow(row) {
+		var tablerow = "";
+		row.forEach(function(element) {
+			tablerow += "<td>" + element + "</td>";
 		});
 
-		return "<tr>" + column + "</tr>";
+		return "<tr>" + tablerow + "</tr>";
 	}
 
 
@@ -45,10 +49,10 @@ $(document).ready(function() {
 		var rows = "";
 
 		x.forEach(function(row) {
-			rows = rows.concat(tableFromArray(row));
+			rows += tableFromRow(row);
 		});
 
-		$('#test').append("<table>" + rows + "</table>");
+		return "<table>" + rows + "</table>";
 	}
 
 
@@ -62,7 +66,7 @@ $(document).ready(function() {
 			}
 		}
 
-		print2darr(weights);
+		$('#test').append(print2darr(weights));
 	}
 
 
@@ -91,7 +95,7 @@ $(document).ready(function() {
 	// Just an inverse to updateWeightsSuccess for now, since weight is only
 	// increasing when distance is 0 (i.e. for the element we got wrong)
 	function updateWeightsFailure(from, to, distFromEnd) {
-		if (distFromEnd == 0) {
+		if (distFromEnd === 0) {
 			for (var i = 0; i < 13; i++) {
 				weights[from][i] -= 0.01;
 			}
@@ -131,7 +135,6 @@ $(document).ready(function() {
 	$('#play').click(function() {
 		resetButtons();
 		$(this).prop("disabled", true);
-		$(this).prop("value", 'gjhjqsfdsh'); // not working (clearly)
 	
 		firstNum = Math.floor(Math.random() * 25) + 1;
 		var chosenInterval = chooseInterval(run[run.length - 1]);
@@ -167,7 +170,7 @@ $(document).ready(function() {
 
 		run.push(correctNum);
 
-		if (selectedNum == correctNum) {
+		if (selectedNum === correctNum) {
 			$(this).css("background-color", "limegreen");
 			updateWeightsSuccess(run[run.length - 2], run[run.length-1]);
 		}
@@ -183,11 +186,19 @@ $(document).ready(function() {
 		}
 
 		$('#test').empty();
-		print2darr(weights);
+		$('#test').append(print2darr(weights));
 
 	});
-});
 
+	$('#debug').click(function() {
+		if ($(this).is(':checked')) {
+			$('#test').show();
+		}
+		else {
+			$('#test').hide();
+		}
+	});
+});
 
 // Re-enables buttons
 function resetButtons() {
