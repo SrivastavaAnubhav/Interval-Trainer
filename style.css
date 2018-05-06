@@ -51,3 +51,9 @@ td {
     margin: 2px;
     outline: none;
 }
+
+#chart_div {
+	margin: auto;
+	width: 600px;
+	height: 300px;
+}

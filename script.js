@@ -1,7 +1,7 @@
 $(document).ready(function() {
 	$('#options :button').prop("disabled", true);
 	$('#replay').prop("disabled", true);
-	$('#debug').prop("checked", false);
+	$('#debug').prop("checked", true);
 
 	const NOTE_PATHS = {
 		1:"C3.wav",
@@ -42,8 +42,67 @@ $(document).ready(function() {
 	they are worse.
 	*/
 	var weights = new Array(NUM_WEIGHTS);
+	var debug = true;
+	var graphData;
+	const options = {
+		legend: {
+			position: "none"
+		},
+		animation: {
+			startup: true,
+			duration: 1000,
+			easing: "in"
+		},
+		vAxis: {
+			viewWindow: {
+				min: 0.0,
+				max: 1.0
+			}
+		},
+		bar: {
+			groupWidth: "90%"
+		}
+	};
+	var scoresGraph;
+
 	initWeights();
-	var debug = false;
+	google.charts.load('current', {packages: ['corechart', 'bar']});
+	google.charts.setOnLoadCallback(initGraph);
+
+
+	function initGraph() {
+		graphData = new google.visualization.DataTable();
+
+		graphData.addColumn('string', 'Interval Name');
+		graphData.addColumn('number', 'Score');
+		graphData.addRows([
+			["Perfect Unison", 0.5],
+			["Minor 2nd", 0.5],
+			["Major 2nd", 0.5],
+			["Minor 3rd", 0.5],
+			["Major 3rd", 0.5],
+			["Perfect 4th", 0.5],
+			["Tritone", 0.5],
+			["Perfect 5th", 0.5],
+			["Minor 6th", 0.5],
+			["Major 6th", 0.5],
+			["Minor 7th", 0.5],
+			["Major 7th", 0.5],
+			["Perfect Octave", 0.5]
+		]);
+
+		scoresGraph = new google.visualization.ColumnChart(document.getElementById('chart_div'));
+		scoresGraph.draw(graphData, options);
+	}
+
+
+	function drawScores(scores) {
+		for (var i = 0; i < NUM_WEIGHTS; ++i) {
+			graphData.setValue(i, 1, scores[i]);
+		}
+
+		scoresGraph.draw(graphData, options);
+	}
 
 
 	// Initializes the weights of the transition matrix uniformly
@@ -71,24 +130,20 @@ $(document).ready(function() {
 	}
 
 
-	// Simple model for now, reduce the weight of the one we got right
-	// so we get it less often in the future.
 	function updateWeightsSuccess(interval) {
-		weights[interval] -= 1;
+		weights[interval] += 2;
 		for (var i = 0; i < NUM_WEIGHTS; ++i) {
 			if (i != interval) {
-				// Bump up all other scores so examples that haven't been
-				// seen in a while start showing up again
-				weights[i] += 0.1;
+				weights[i] -= 0.1;
 			}
 		}
 	}
 
 	function updateWeightsFailure(interval) {
-		weights[interval] += 1;
+		weights[interval] -= 1;
 		for (var i = 0; i < NUM_WEIGHTS; ++i) {
 			if (i != interval) {
-				weights[i] += 0.1;
+				weights[i] -= 0.1;
 			}
 		}
 	}
@@ -99,6 +154,7 @@ $(document).ready(function() {
 	}
 
 
+	// Chooses an interval such that the harder ones are chosen more often
 	function chooseInterval() {
 		var intervalErrorRates = new Array(NUM_WEIGHTS);
 		var totalError = 0;
@@ -113,6 +169,7 @@ $(document).ready(function() {
 			intervalErrorRates[i] /= totalError;
 		}
 
+		// sample from the normalized probabilities
 		var sum = 0;
 		var rand = Math.random();
 		for (var i = 0; i < NUM_WEIGHTS; ++i) {
@@ -131,10 +188,6 @@ $(document).ready(function() {
 
 	// Controls the clicking of the play button
 	$('#play').click(function() {
-		if (debug) {
-			console.log(weights);			
-		}
-
 		// Disable all answer buttons
 		$('#options :button').prop('disabled', false);
 
@@ -165,7 +218,7 @@ $(document).ready(function() {
 	});
 
 
-	// When an option is selected, disables all others,
+	// When an answer is chosen, disables all others,
 	// records whether is was correct and updates weights
 	$('.option').click(function() {
 		$('#options :button').prop("disabled", true);
@@ -173,19 +226,37 @@ $(document).ready(function() {
 		$('#play').text("Next");
 
 	
-		var selectedInterval = $(this).prop('id').substring(4,5);
+		// Check that # from diff# is the same as the interval
+		var selectedInterval = $(this).prop('id').substring(4);
 		var correctInterval = Math.abs(firstNote - secondNote);
 
 		if (selectedInterval == correctInterval) {
 			$(this).css("background-color", "limegreen");
-			updateWeightsSuccess(selectedInterval);
+
+			if (debug) {
+				console.log("Successfully guessed interval " + correctInterval)
+			}
+			updateWeightsSuccess(correctInterval);
 		}
 		else {
 			$(this).css("background-color", "red");
 			$('#diff' + Math.abs(firstNote - secondNote)).css("background-color", "limegreen");
 
-			updateWeightsFailure(selectedInterval);
+			if (debug) {
+				console.log("Failed to guess interval " + correctInterval)
+			}
+			updateWeightsFailure(correctInterval);
 		}
+
+		if (debug) {
+			console.log(weights);			
+		}
+
+		var scores = new Array(13);
+		for (var i = 0; i < NUM_WEIGHTS; ++i) {
+			scores[i] = sigmoid(weights[i]);
+		}
+		drawScores(scores);
 	});
 
 	$('#debug').click(function() {
