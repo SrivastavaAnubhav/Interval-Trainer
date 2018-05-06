@@ -1,217 +1,17 @@
 $(document).ready(function() {
 	$('#options :button').prop("disabled", true);
 	$('#replay').prop("disabled", true);
-	$('#debug').prop("checked", true);
+	$('#debug').prop("checked", false);
 
 	/* 
-	weights is a 14 x 13 matrix. Each row has the probability of failing from
+	weights is a size 13 matrix. Each row has the probability of failing from
 	transitioning from the row into the column (i.e. if the relative
 	probability of failure with interval value of 4 (major 3rd) is 0.2
 	if the previous interval was 9, weights[9][4] = 0.2). The 14th row
 	is the start value, when there is no previous interval. Also, any row
 	sums to 1.
 	*/
-	const START = 13;
-	var firstNum, secondNum, weights;
-	var run = [START]; // initially holds the start symbol
-	initWeights();
-
-	// Prints an element to the test div
-	function print(x) {
-		return "<p>" + x + "</p>";
-	}
-
-
-	// Prints a 1D array to the test div
-	function printarr(x) {
-		var row = "";
-		x.forEach(function(element) {
-			row += print(element);
-		});
-
-		return row;
-	}
-
-
-	// Gets an HTML table from an array
-	function tableFromRow(row) {
-		var tablerow = "";
-		row.forEach(function(element) {
-			tablerow += "<td>" + element + "</td>";
-		});
-
-		return "<tr>" + tablerow + "</tr>";
-	}
-
-
-	// Prints a 2D array to the test div
-	function print2darr(x) {
-		var rows = "";
-
-		x.forEach(function(row) {
-			rows += tableFromRow(row);
-		});
-
-		return "<table>" + rows + "</table>";
-	}
-
-
-	// Initializes the weights of the transition matrix uniformly
-	function initWeights() {
-		weights = new Array(14);
-		for (var i = 0; i < 14; i++) {
-			weights[i] = new Array(13);
-			for (var j = 0; j < 13; j++) {
-				weights[i][j] = 1/13;
-			}
-		}
-
-		$('#test').append(print2darr(weights));
-	}
-
-
-	// Plays the first and second notes in sequence
-	function playBoth() {
-		var first = new Audio("Notes/" + getLoc(firstNum));
-		var second = new Audio("Notes/" + getLoc(secondNum));
-		
-		first.addEventListener('ended', function() {
-			second.play();
-		});
-
-		first.play();
-	}
-
-
-	// Simple model for now, take away weight from the one we got right
-	// so that we get it less in the future
-	function updateWeightsSuccess(from, to) { 
-		for (var i = 0; i < 13; i++) {
-			weights[from][i] += 0.01;
-		}
-		weights[from][to] -= 0.13;
-	}
-
-	// Just an inverse to updateWeightsSuccess for now, since weight is only
-	// increasing when distance is 0 (i.e. for the element we got wrong)
-	function updateWeightsFailure(from, to, distFromEnd) {
-		if (distFromEnd === 0) {
-			for (var i = 0; i < 13; i++) {
-				weights[from][i] -= 0.01;
-			}
-			weights[from][to] += 0.13;			
-		}
-	}
-
-
-	// Takes in an array of numbers and returns the max
-	function listmax(ls) {
-		cum = 0;
-		ls.forEach(function(item) {
-			if (item > cum) {
-				cum = item;
-			}
-		});
-
-		return cum;
-	}
-
-
-	function chooseInterval(from) {
-		var cumsum = 0;
-		var count = -1;
-		var rand = Math.random();
-
-		do {
-			count++;
-			cumsum += weights[from][count];
-		} while (rand > cumsum);
-
-		return count;
-	}
-
-
-	// Controls the clicking of the play button
-	$('#play').click(function() {
-		resetButtons();
-		$(this).prop("disabled", true);
-	
-		firstNum = Math.floor(Math.random() * 25) + 1;
-		var chosenInterval = chooseInterval(run[run.length - 1]);
-
-		// array of valid choices
-		var choices = []
-		if (firstNum + chosenInterval < 26) {
-			choices.push(firstNum + chosenInterval);
-		}
-		if (firstNum - chosenInterval > 0) {
-			choices.push(firstNum - chosenInterval);
-		}
-		secondNum = choices[Math.floor(Math.random() * choices.length)];
-
-		playBoth();
-	});
-
-
-	// Clicking replay just plays both notes again
-	$('#replay').click(function() {
-		playBoth();
-	});
-
-
-	// When an option is selected, disables all others,
-	// records whether is was correct and updates weights
-	$('.option').click(function() {
-		$('#options :button').prop("disabled", true);
-		$('#play').prop("disabled", false);		
-	
-		var selectedNum = $(this).prop('id').substring(4,5);
-		var correctNum = Math.abs(firstNum - secondNum);
-
-		run.push(correctNum);
-
-		if (selectedNum === correctNum) {
-			$(this).css("background-color", "limegreen");
-			updateWeightsSuccess(run[run.length - 2], run[run.length-1]);
-		}
-		else {
-			$(this).css("background-color", "red");
-			$('#diff' + Math.abs(firstNum - secondNum)).css("background-color", "limegreen");
-
-			for (var i = run.length - 1; i > 0; i--) {
-				updateWeightsFailure(run[i - 1], run[i], run.length - i - 1);
-			}
-
-			run = [START];
-		}
-
-		$('#test').empty();
-		$('#test').append(print2darr(weights));
-
-	});
-
-	$('#debug').click(function() {
-		if ($(this).is(':checked')) {
-			$('#test').show();
-		}
-		else {
-			$('#test').hide();
-		}
-	});
-});
-
-// Re-enables buttons
-function resetButtons() {
-	$('#options :button').prop('disabled', false);
-	$('#options :button').prop('style','');
-	$('#replay').prop("disabled", false);
-}
-
-
-// Returns the correct note given index
-// Maybe one day I will be able to auto-generate audio...
-function getLoc(index) {
-	var noteLocations = {
+	const NOTE_PATHS = {
 		1:"C3.wav",
 		2:"Csharp3.wav",
 		3:"D3.wav",
@@ -238,6 +38,168 @@ function getLoc(index) {
 		24:"B4.wav",
 		25:"C5.wav",
 	};
+	const NUM_WEIGHTS = 13;
+
+	// Must remember which notes we played to allow replaying
+	var firstNote, secondNote;
+	var weights = new Array(NUM_WEIGHTS);
+	initWeights();
+	var debug = false;
+
+
+	// Initializes the weights of the transition matrix uniformly
+	function initWeights() {
+		for (var i = 0; i < NUM_WEIGHTS; ++i) {
+			weights[i] = 0;
+		}
+	}
+
+
+	// Plays the first and second notes in sequence
+	function playBoth() {
+		var first = new Audio("Notes/" + NOTE_PATHS[firstNote]);
+		var second = new Audio("Notes/" + NOTE_PATHS[secondNote]);
+		
+		first.addEventListener('ended', function() {
+			second.play();
+		});
+
+		first.play();
+	}
+
+
+	// Simple model for now, reduce the weight of the one we got right
+	// so we get it less often in the future.
+	function updateWeightsSuccess(interval) {
+		weights[interval] -= 1;
+		for (var i = 0; i < NUM_WEIGHTS; ++i) {
+			if (i != interval) {
+				// Bump up all other scores so examples that haven't been
+				// seen in a while start showing up again
+				weights[i] += 0.1;
+			}
+		}
+	}
+
+	function updateWeightsFailure(interval) {
+		weights[interval] += 1;
+		for (var i = 0; i < NUM_WEIGHTS; ++i) {
+			if (i != interval) {
+				weights[i] += 0.1;
+			}
+		}
+	}
+
+
+	function sigmoid(x) {
+		return 1/(1 + Math.exp(-x));
+	}
+
+
+	function chooseInterval() {
+		var intervalErrorRates = new Array(NUM_WEIGHTS);
+		var totalError = 0;
+		// calculate sum of errors for each interval
+		for (var i = 0; i < NUM_WEIGHTS; ++i) {
+			intervalErrorRates[i] = 1 - sigmoid(weights[i]);
+			totalError += intervalErrorRates[i];
+		}
+
+		// normalize
+		for (var i = 0; i < NUM_WEIGHTS; ++i) {
+			intervalErrorRates[i] /= totalError;
+		}
+
+		var sum = 0;
+		var rand = Math.random();
+		for (var i = 0; i < NUM_WEIGHTS; ++i) {
+			sum += intervalErrorRates[i];
+			if (rand <= sum) {
+				return i;
+			}
+		}
+
+		if (debug) {
+			console.error("Could not find an interval");
+		}
+		return 0;
+	}
+
+
+	// Controls the clicking of the play button
+	$('#play').click(function() {
+		if (debug) {
+			console.log(weights);			
+		}
+
+		resetButtons();
+		$(this).prop("disabled", true);
+	
+		firstNote = Math.floor(Math.random() * 25) + 1;
+		var chosenInterval = chooseInterval();
+
+		// array of valid choices
+		var choices = []
+		if (firstNote + chosenInterval < 26) {
+			choices.push(firstNote + chosenInterval);
+		}
+		if (firstNote - chosenInterval > 0) {
+			choices.push(firstNote - chosenInterval);
+		}
+		secondNote = choices[Math.floor(Math.random() * choices.length)];
+
+		playBoth();
+	});
+
+
+	// Clicking replay just plays both notes again
+	$('#replay').click(function() {
+		playBoth();
+	});
+
+
+	// When an option is selected, disables all others,
+	// records whether is was correct and updates weights
+	$('.option').click(function() {
+		$('#options :button').prop("disabled", true);
+		$('#play').prop("disabled", false);		
+	
+		var selectedInterval = $(this).prop('id').substring(4,5);
+		var correctInterval = Math.abs(firstNote - secondNote);
+
+		if (selectedInterval == correctInterval) {
+			$(this).css("background-color", "limegreen");
+			updateWeightsSuccess();
+		}
+		else {
+			$(this).css("background-color", "red");
+			$('#diff' + Math.abs(firstNote - secondNote)).css("background-color", "limegreen");
+
+			updateWeightsFailure();
+		}
+	});
+
+	$('#debug').click(function() {
+		if ($(this).is(':checked')) {
+			debug = true;
+		}
+		else {
+			debug = false;
+		}
+	});
+});
+
+// Re-enables buttons
+function resetButtons() {
+	$('#options :button').prop('disabled', false);
+	$('#options :button').prop('style','');
+	$('#replay').prop("disabled", false);
+}
+
+
+// Returns the correct note given index
+// Maybe one day I will be able to auto-generate audio...
+function getLoc(index) {
 
 	return noteLocations[index];
 }
