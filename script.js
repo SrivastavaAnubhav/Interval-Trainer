@@ -3,14 +3,6 @@ $(document).ready(function() {
 	$('#replay').prop("disabled", true);
 	$('#debug').prop("checked", false);
 
-	/* 
-	weights is a size 13 matrix. Each row has the probability of failing from
-	transitioning from the row into the column (i.e. if the relative
-	probability of failure with interval value of 4 (major 3rd) is 0.2
-	if the previous interval was 9, weights[9][4] = 0.2). The 14th row
-	is the start value, when there is no previous interval. Also, any row
-	sums to 1.
-	*/
 	const NOTE_PATHS = {
 		1:"C3.wav",
 		2:"Csharp3.wav",
@@ -42,6 +34,13 @@ $(document).ready(function() {
 
 	// Must remember which notes we played to allow replaying
 	var firstNote, secondNote;
+
+	/* 
+	weights is an array where each index contains a number representing
+	how good the user is at guessing the corresponding interval. More
+	positive numbers mean they are better, and more negative numbers mean
+	they are worse.
+	*/
 	var weights = new Array(NUM_WEIGHTS);
 	initWeights();
 	var debug = false;
@@ -57,11 +56,15 @@ $(document).ready(function() {
 
 	// Plays the first and second notes in sequence
 	function playBoth() {
+		$('#replay').prop("disabled", true);
 		var first = new Audio("Notes/" + NOTE_PATHS[firstNote]);
 		var second = new Audio("Notes/" + NOTE_PATHS[secondNote]);
 		
 		first.addEventListener('ended', function() {
 			second.play();
+		});
+		second.addEventListener('ended', function() {
+			$('#replay').prop("disabled", false);
 		});
 
 		first.play();
@@ -132,7 +135,11 @@ $(document).ready(function() {
 			console.log(weights);			
 		}
 
-		resetButtons();
+		// Disable all answer buttons
+		$('#options :button').prop('disabled', false);
+
+		// Clear colors
+		$('#options :button').prop('style','');
 		$(this).prop("disabled", true);
 	
 		firstNote = Math.floor(Math.random() * 25) + 1;
@@ -162,20 +169,22 @@ $(document).ready(function() {
 	// records whether is was correct and updates weights
 	$('.option').click(function() {
 		$('#options :button').prop("disabled", true);
-		$('#play').prop("disabled", false);		
+		$('#play').prop("disabled", false);
+		$('#play').text("Next");
+
 	
 		var selectedInterval = $(this).prop('id').substring(4,5);
 		var correctInterval = Math.abs(firstNote - secondNote);
 
 		if (selectedInterval == correctInterval) {
 			$(this).css("background-color", "limegreen");
-			updateWeightsSuccess();
+			updateWeightsSuccess(selectedInterval);
 		}
 		else {
 			$(this).css("background-color", "red");
 			$('#diff' + Math.abs(firstNote - secondNote)).css("background-color", "limegreen");
 
-			updateWeightsFailure();
+			updateWeightsFailure(selectedInterval);
 		}
 	});
 
@@ -188,18 +197,3 @@ $(document).ready(function() {
 		}
 	});
 });
-
-// Re-enables buttons
-function resetButtons() {
-	$('#options :button').prop('disabled', false);
-	$('#options :button').prop('style','');
-	$('#replay').prop("disabled", false);
-}
-
-
-// Returns the correct note given index
-// Maybe one day I will be able to auto-generate audio...
-function getLoc(index) {
-
-	return noteLocations[index];
-}
