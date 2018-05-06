@@ -61,7 +61,8 @@ $(document).ready(function() {
 		},
 		bar: {
 			groupWidth: "90%"
-		}
+		},
+		backgroundColor: "#FAFAFA"
 	};
 	var scoresGraph;
 
